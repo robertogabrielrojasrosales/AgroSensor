@@ -8,13 +8,7 @@ import {
   getLoginRetryAfter,
   recordFailedLogin,
 } from '@/lib/auth-session'
-import { callMakeApi, isTimeoutError } from '@/lib/make-api'
-
-function messageFrom(value: unknown) {
-  if (!value || typeof value !== 'object' || !('message' in value)) return null
-  const message = (value as { message?: unknown }).message
-  return typeof message === 'string' && message.trim() ? message.trim().slice(0, 240) : null
-}
+import { authenticateUser } from '@/lib/login-credentials'
 
 export async function POST(request: Request) {
   if (!isAuthSessionConfigured()) {
@@ -53,54 +47,15 @@ export async function POST(request: Request) {
     )
   }
 
-  let makeResult
-  try {
-    makeResult = await callMakeApi('login', { usuario: normalizedUsuario, password })
-  } catch (error) {
-    const timedOut = isTimeoutError(error)
-    return NextResponse.json(
-      { message: timedOut ? 'El servicio de acceso tardó demasiado. Inténtalo de nuevo.' : 'No se pudo conectar con el servicio de acceso.' },
-      { status: timedOut ? 504 : 502 },
-    )
-  }
-  if (!makeResult) {
-    return NextResponse.json({ message: 'La integración con Make no está configurada en el servidor.' }, { status: 503 })
-  }
-
-  const result = makeResult.body
-
-  if (makeResult.status === 401) {
-    recordFailedLogin(normalizedUsuario)
-    return NextResponse.json(
-      { message: messageFrom(result) ?? 'Usuario o contraseña incorrectos.' },
-      { status: 401 },
-    )
-  }
-
-  const usuarioAutenticado =
-    result && typeof result === 'object' && 'usuario' in result && typeof result.usuario === 'string'
-      ? result.usuario.trim()
-      : ''
-  const textoDe = (key: 'nombre' | 'correo', max: number) =>
-    result && typeof result === 'object' && key in result && typeof (result as Record<string, unknown>)[key] === 'string'
-      ? ((result as Record<string, unknown>)[key] as string).trim().slice(0, max)
-      : ''
-  const nombre = textoDe('nombre', 100)
-  const correo = textoDe('correo', 254)
-  const loginCorrecto =
-    makeResult.status >= 200 && makeResult.status < 300 &&
-    result &&
-    typeof result === 'object' &&
-    'success' in result &&
-    result.success === true &&
-    usuarioAutenticado.length > 0 &&
-    usuarioAutenticado.length <= 150
-
-  if (!loginCorrecto) {
-    return NextResponse.json({ message: 'El servicio de acceso no está disponible. Inténtalo más tarde.' }, { status: 502 })
+  // Make solo entrega el hash guardado; la contraseña escrita se convierte a hash y se compara aquí.
+  const resultado = await authenticateUser(normalizedUsuario, password)
+  if (!resultado.ok) {
+    if (resultado.badCredentials) recordFailedLogin(normalizedUsuario)
+    return NextResponse.json({ message: resultado.message }, { status: resultado.status })
   }
 
   clearFailedLogins(normalizedUsuario)
+  const { usuario: usuarioAutenticado, nombre, correo } = resultado
   const sessionToken = createSession(usuarioAutenticado, { nombre, correo })
   if (!sessionToken) {
     return NextResponse.json({ message: 'La configuración de sesiones del servidor está incompleta.' }, { status: 503 })

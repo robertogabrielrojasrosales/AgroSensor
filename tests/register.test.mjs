@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { verifyPassword } from '../lib/password-hash.ts'
 import { createRegistrationHandler } from '../lib/registration-handler.ts'
 
 const makeConfig = { url: 'https://hook.us2.make.com/test-hook', apiKey: 'test-secret' }
@@ -43,13 +44,19 @@ test('registra un usuario nuevo y reenvía a Make usuario, contraseña, nombre y
   })
   assert.equal(receivedUrl, makeConfig.url)
   assert.equal(receivedHeaders['x-make-apikey'], 'test-secret')
-  assert.deepEqual(receivedBody, {
+  // La contraseña nunca viaja en texto plano: a Make le llega un hash con sal que se verifica con la clave original.
+  const { password: enviada, ...resto } = receivedBody
+  assert.deepEqual(resto, {
     usuario: 'roberto01',
-    password: 'clave-segura-123',
     nombre: 'Roberto Rojas',
     correo: 'roberto@gmail.com',
     accion: 'registro',
   })
+  assert.match(enviada, /^scrypt\$/)
+  assert.notEqual(enviada, validRegistration.password)
+  assert.equal(JSON.stringify(receivedBody).includes(validRegistration.password), false)
+  assert.deepEqual(await verifyPassword(validRegistration.password, enviada), { ok: true, legacy: false })
+  assert.equal((await verifyPassword('otra-clave-123', enviada)).ok, false)
 })
 
 test('devuelve 409 cuando el usuario ya existe', async () => {

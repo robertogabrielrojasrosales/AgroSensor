@@ -1,4 +1,5 @@
 import { callMakeApi, isTimeoutError, readMakeApiConfig, type MakeApiConfig } from './make-api.ts'
+import { hashPassword } from './password-hash.ts'
 
 const RATE_LIMIT_WINDOW_MS = 60_000
 const RATE_LIMIT_MAX_ATTEMPTS = 5
@@ -101,11 +102,14 @@ export function createRegistrationHandler({
       return jsonResponse({ success: false, message: 'Las contraseñas no coinciden.' }, 400)
     }
 
+    // A Make y a la hoja solo llega el hash con sal; la contraseña escrita nunca sale de la aplicación.
+    const passwordHash = await hashPassword(password)
+
     let makeResult
     try {
       makeResult = await callMakeApi(
         'registro',
-        { usuario, password, nombre: nombreLimpio, correo: correoLimpio },
+        { usuario, password: passwordHash, nombre: nombreLimpio, correo: correoLimpio },
         { fetcher, config: makeConfig === undefined ? readMakeApiConfig() : makeConfig },
       )
     } catch (error) {

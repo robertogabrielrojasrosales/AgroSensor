@@ -5,6 +5,7 @@ const MAKE_TIMEOUT_MS = 20_000
 
 export type MakeApiAction =
   | 'login'
+  | 'login_hash'
   | 'registro'
   | 'parcelas_listar'
   | 'parcelas_insertar'
