@@ -30,6 +30,11 @@ export type Screen =
   | 'add-parcel-contact'
   | 'add-parcel'
   | 'edit-parcel'
+  | 'forgot-password'
+  | 'reset-password'
+
+// Datos del enlace de recuperación que llegó por correo (usuario y código de un solo uso).
+export type ResetRequest = { usuario: string; token: string }
 
 const FADE_SCREENS: Screen[] = ['splash', 'success', 'postpone']
 
@@ -60,6 +65,7 @@ type AgroState = {
   soundEnabled: boolean
   registrationMessage: string
   setRegistrationMessage: (message: string) => void
+  resetRequest: ResetRequest | null
   parcelMessage: string
   setParcelMessage: (message: string) => void
   push: (screen: Screen) => void
@@ -105,8 +111,21 @@ function getIrrigationMoisture(currentMoisture: number) {
   return Math.min(100, currentMoisture + increase)
 }
 
-export function AgroProvider({ children, initialUser = null }: { children: ReactNode; initialUser?: User | null }) {
-  const [stack, setStack] = useState<Screen[]>([initialUser ? 'parcels' : 'login'])
+export function AgroProvider({
+  children,
+  initialUser = null,
+  resetRequest = null,
+}: {
+  children: ReactNode
+  initialUser?: User | null
+  resetRequest?: ResetRequest | null
+}) {
+  const [stack, setStack] = useState<Screen[]>([resetRequest ? 'reset-password' : initialUser ? 'parcels' : 'login'])
+
+  // El código ya quedó en memoria: se quita de la barra de direcciones para que no se guarde en el historial.
+  useEffect(() => {
+    if (resetRequest) window.history.replaceState(null, '', window.location.pathname)
+  }, [resetRequest])
   const [transition, setTransition] = useState<Transition>({ direction: 1, fade: true })
   const [user, setUserState] = useState<User | null>(initialUser)
   const [parcels, setParcels] = useState<Parcel[]>(INITIAL_PARCELS)
@@ -349,6 +368,7 @@ export function AgroProvider({ children, initialUser = null }: { children: React
     soundEnabled,
     registrationMessage,
     setRegistrationMessage,
+    resetRequest,
     parcelMessage,
     setParcelMessage,
     push,

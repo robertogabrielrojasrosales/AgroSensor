@@ -7,6 +7,8 @@ export type MakeApiAction =
   | 'login'
   | 'login_hash'
   | 'registro'
+  | 'recuperar_solicitar'
+  | 'recuperar_confirmar'
   | 'parcelas_listar'
   | 'parcelas_insertar'
   | 'parcelas_actualizar'

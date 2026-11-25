@@ -282,6 +282,167 @@ export function RegisterScreen() {
   )
 }
 
+export function ForgotPasswordScreen() {
+  const { back } = useAgro()
+  const form = useForm(['usuario'])
+  const [serverError, setServerError] = useState('')
+  const [sentMessage, setSentMessage] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!form.submit() || isSubmitting) return
+
+    setServerError('')
+    setIsSubmitting(true)
+    try {
+      const response = await fetch('/api/auth/forgot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario: form.values.usuario.trim() }),
+      })
+      const result = (await response.json().catch(() => null)) as { success?: unknown; message?: unknown } | null
+
+      if (!response.ok || result?.success !== true) {
+        setServerError(typeof result?.message === 'string' ? result.message : 'No se pudo enviar el enlace. Inténtalo más tarde.')
+        return
+      }
+      setSentMessage(typeof result.message === 'string' ? result.message : 'Si existe una cuenta con ese usuario, enviamos un enlace al correo registrado.')
+    } catch {
+      setServerError('No se pudo conectar con el servicio. Revisa tu conexión e inténtalo de nuevo.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      <ScreenHeader title="Recuperar contraseña" onBack={back} />
+      <form onSubmit={onSubmit} noValidate className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 pt-6 pb-6 no-scrollbar">
+        <div className="mb-2">
+          <h2 className="text-2xl font-bold">¿Olvidaste tu contraseña?</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Escribe tu usuario y te enviaremos un enlace al correo con el que te registraste.
+          </p>
+        </div>
+        {sentMessage ? (
+          <div role="status" className="rounded-xl border border-primary/25 bg-primary/5 p-4 text-sm">
+            <p className="font-semibold text-primary">{sentMessage}</p>
+            <p className="mt-2 text-muted-foreground">Revisa tu bandeja de entrada y también la carpeta de spam.</p>
+          </div>
+        ) : (
+          <TextField
+            label="Usuario"
+            icon={<User />}
+            value={form.values.usuario}
+            onChange={form.set('usuario')}
+            onBlur={form.blur('usuario')}
+            error={form.error('usuario')}
+            autoComplete="username"
+            placeholder="Tu usuario"
+          />
+        )}
+        {serverError && <p role="alert" className="text-sm font-medium text-danger">{serverError}</p>}
+        <div className="mt-auto flex flex-col gap-2 pt-4">
+          {!sentMessage && (
+            <AppButton type="submit" disabled={isSubmitting} aria-busy={isSubmitting}>
+              {isSubmitting ? 'Enviando enlace…' : 'Enviarme el enlace'}
+            </AppButton>
+          )}
+          <AppButton variant={sentMessage ? 'primary' : 'ghost'} onClick={back}>
+            Volver a iniciar sesión
+          </AppButton>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+export function ResetPasswordScreen() {
+  const { resetRequest, reset, setRegistrationMessage } = useAgro()
+  const form = useForm(['password', 'confirmPassword'])
+  const [serverError, setServerError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!form.submit() || isSubmitting || !resetRequest) return
+
+    setServerError('')
+    setIsSubmitting(true)
+    try {
+      const response = await fetch('/api/auth/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          usuario: resetRequest.usuario,
+          token: resetRequest.token,
+          password: form.values.password,
+          confirmPassword: form.values.confirmPassword,
+        }),
+      })
+      const result = (await response.json().catch(() => null)) as { success?: unknown; message?: unknown } | null
+
+      if (!response.ok || result?.success !== true) {
+        setServerError(typeof result?.message === 'string' ? result.message : 'No se pudo cambiar la contraseña. Inténtalo más tarde.')
+        return
+      }
+      setRegistrationMessage('Contraseña actualizada. Ya puedes iniciar sesión.')
+      reset('login')
+    } catch {
+      setServerError('No se pudo conectar con el servicio. Revisa tu conexión e inténtalo de nuevo.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      <ScreenHeader title="Nueva contraseña" />
+      <form onSubmit={onSubmit} noValidate className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 pt-6 pb-6 no-scrollbar">
+        <div className="mb-2">
+          <h2 className="text-2xl font-bold">Elige tu nueva contraseña</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {resetRequest ? <>Cuenta: <strong>{resetRequest.usuario}</strong></> : 'Este enlace ya no es válido. Pide uno nuevo desde el inicio de sesión.'}
+          </p>
+        </div>
+        <TextField
+          label="Contraseña nueva"
+          icon={<Lock />}
+          type="password"
+          value={form.values.password}
+          onChange={form.set('password')}
+          onBlur={form.blur('password')}
+          error={form.error('password')}
+          autoComplete="new-password"
+          placeholder="Mínimo 8 caracteres"
+          hint="Usa al menos 8 caracteres."
+        />
+        <TextField
+          label="Confirmar contraseña"
+          icon={<Lock />}
+          type="password"
+          value={form.values.confirmPassword}
+          onChange={form.set('confirmPassword')}
+          onBlur={form.blur('confirmPassword')}
+          error={form.error('confirmPassword')}
+          autoComplete="new-password"
+          placeholder="Vuelve a escribir tu contraseña"
+        />
+        {serverError && <p role="alert" className="text-sm font-medium text-danger">{serverError}</p>}
+        <div className="mt-auto flex flex-col gap-2 pt-4">
+          <AppButton type="submit" disabled={isSubmitting || !resetRequest} aria-busy={isSubmitting}>
+            {isSubmitting ? 'Guardando…' : 'Cambiar contraseña'}
+          </AppButton>
+          <AppButton variant="ghost" onClick={() => { setRegistrationMessage(''); reset('login', -1) }}>
+            Ir a iniciar sesión
+          </AppButton>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 export function LoginScreen() {
   const { setUser, reset, push, registrationMessage, setRegistrationMessage, setParcelMessage } = useAgro()
   const form = useForm(['usuario', 'password'])
@@ -370,6 +531,13 @@ export function LoginScreen() {
           placeholder="Tu contraseña"
         />
         {serverError && <p role="alert" className="text-sm font-medium text-danger">{serverError}</p>}
+        <button
+          type="button"
+          onClick={() => { setRegistrationMessage(''); push('forgot-password') }}
+          className="-mt-1 self-start rounded-md text-sm font-semibold text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          ¿Olvidaste tu contraseña?
+        </button>
         <div className="mt-auto flex flex-col gap-2 pt-4">
           <AppButton type="submit" disabled={isSubmitting} aria-busy={isSubmitting}>
             {isSubmitting ? 'Validando acceso…' : 'Iniciar sesión'}

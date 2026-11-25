@@ -3,9 +3,9 @@
 import { AnimatePresence, motion, type Variants } from 'motion/react'
 import { useState } from 'react'
 import type { ComponentType } from 'react'
-import { AgroProvider, useAgro, type Screen, type Transition } from './app-store'
+import { AgroProvider, useAgro, type ResetRequest, type Screen, type Transition } from './app-store'
 import { AssistantBubble, BottomNav, NotificationBanner, StatusBar } from './chrome'
-import { LoginScreen, RegisterScreen } from './screens/auth-screens'
+import { ForgotPasswordScreen, LoginScreen, RegisterScreen, ResetPasswordScreen } from './screens/auth-screens'
 import { DetailScreen } from './screens/detail-screen'
 import { ExpandedHistoryScreen, HistoryScreen } from './screens/history-screen'
 import { ParcelsScreen } from './screens/parcels-screen'
@@ -32,6 +32,8 @@ const SCREENS: Record<Screen, ComponentType> = {
   'add-parcel-contact': ParcelListScreen,
   'add-parcel': RegisterParcelScreen,
   'edit-parcel': EditParcelScreen,
+  'forgot-password': ForgotPasswordScreen,
+  'reset-password': ResetPasswordScreen,
 }
 
 const NAV_SCREENS: Screen[] = ['parcels', 'detail', 'history', 'recommendation', 'alerts', 'settings']
@@ -100,11 +102,17 @@ function PhoneContent({ assistantOpen, onAssistantClick }: { assistantOpen: bool
   )
 }
 
-export function AgroApp({ initialUser }: { initialUser: { name: string; email?: string } | null }) {
+export function AgroApp({
+  initialUser,
+  resetRequest = null,
+}: {
+  initialUser: { name: string; email?: string } | null
+  resetRequest?: ResetRequest | null
+}) {
   const [assistantOpen, setAssistantOpen] = useState(false)
 
   return (
-    <AgroProvider initialUser={initialUser}>
+    <AgroProvider initialUser={initialUser} resetRequest={resetRequest}>
       <div className="relative flex h-dvh w-full flex-col overflow-hidden bg-background sm:h-[min(844px,calc(100dvh-2rem))] sm:w-[390px] sm:rounded-[3rem] sm:border-[10px] sm:border-neutral-900 sm:shadow-2xl sm:shadow-black/30 sm:ring-1 sm:ring-neutral-700">
         <span className="pointer-events-none absolute top-2 left-1/2 z-40 hidden h-7 w-28 -translate-x-1/2 rounded-full bg-neutral-900 sm:block" aria-hidden />
         <PhoneContent assistantOpen={assistantOpen} onAssistantClick={() => setAssistantOpen(true)} />

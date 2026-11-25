@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { AgroApp } from '@/components/agro/agro-app'
 import { AUTH_COOKIE_NAME, getSession } from '@/lib/auth-session'
+import { isWellFormedResetToken } from '@/lib/password-recovery'
 
 const FLOW = [
   'Inicio',
@@ -13,9 +14,19 @@ const FLOW = [
   'Resultado',
 ]
 
-export default async function Page() {
+const un = (valor: string | string[] | undefined) => (typeof valor === 'string' ? valor : undefined)
+
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const cookieStore = await cookies()
   const session = getSession(cookieStore.get(AUTH_COOKIE_NAME)?.value)
+
+  // Enlace de recuperación de contraseña recibido por correo: ?reset=<código>&usuario=<usuario>
+  const params = await searchParams
+  const token = un(params.reset)
+  const usuarioReset = un(params.usuario)
+  const resetRequest = token && usuarioReset && usuarioReset.length <= 150 && isWellFormedResetToken(token)
+    ? { usuario: usuarioReset, token }
+    : null
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-[radial-gradient(ellipse_at_top,#dcebe2,#eef3f0_55%,#e6ece8)] sm:gap-16 sm:p-4">
@@ -39,7 +50,7 @@ export default async function Page() {
         </ol>
         <p className="mt-6 text-xs text-muted-foreground">Activa el sonido de tu equipo para escuchar la notificación.</p>
       </aside>
-      <AgroApp initialUser={session ? { name: session.nombre || session.usuario, email: session.correo } : null} />
+      <AgroApp initialUser={session ? { name: session.nombre || session.usuario, email: session.correo } : null} resetRequest={resetRequest} />
     </div>
   )
 }
